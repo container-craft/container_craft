@@ -1,0 +1,1 @@
+from container_craft.mc_mod_manager import mod_manager

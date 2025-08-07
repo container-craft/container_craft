@@ -1,0 +1,39 @@
+FROM {{ parent_image }}
+
+{% for key, value in env.items() %}
+ENV {{ key }} {{ value }}
+{% endfor %}
+
+{% if modloader %}
+# Modloader installation logic
+{{ modloader_fetch_command }}
+
+{{ modloader_install_command }}
+{% endif %}
+
+{% if mods %}
+COPY mods/ /home/mc/mods
+{% endif %}
+
+{% if plugins %}
+COPY plugins/ /home/mc/plugins
+{% endif %}
+
+# There are two different configs. One is for mod configs or plugin configs depending on the modloader.
+# In our entry point, we handle the following logic.
+
+{% for config_file in config_files %}
+COPY {{ config_file }} /home/mc/{{ config_file }}
+{% endfor %}
+
+
+{% if entrypoint %}
+# Entry point script
+USER root
+COPY {{ entrypoint }} /usr/bin/entrypoint.sh
+RUN chmod +x /usr/bin/entrypoint.sh
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+USER mc
+{% endif %}
+
+

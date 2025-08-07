@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Container Craft Configuration Schema",
+  "type": "object",
+  "properties": {
+    "version": {"type": "string"},
+    "include": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "kconfig": {"type": "string"},
+        "build_dir": {"type": "string"},
+        "layers_dir": {"type": "string"},
+        "cache_dir": {"type": "string"},
+        "downloads_dir": {"type": ["string", "null"]},
+        "fetch_mods": {"type": "boolean"},
+        "branch": {"type": "string"},
+        "env": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
+      },
+      "required": ["kconfig", "build_dir", "layers_dir", "cache_dir", "fetch_mods", "branch"]
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string"},
+          "branch": {"type": "string"},
+          "commit": {"type": ["string", "null"]},
+          "path": {"type": "string"},
+          "meta": {
+            "type": "object",
+            "properties": {
+              "url": {"type": "string"},
+              "path": {"type": "string"}
+            },
+            "required": ["url", "path"]
+          }
+        },
+        "required": ["url", "path"]
+      }
+    },
+    "networks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "subdomain": {"type": "string"},
+          "gateway": {"type": "string"}
+        },
+        "required": ["subdomain", "gateway"]
+      }
+    },
+    "servers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+        "parent_image": {"type": "string"},
+        "modloader": {"type": "string", "enum": ["fabric", "forge", "paper", "neoforge", "velocity"]},
+        "installer": {
+          "type": "object",
+          "properties": {
+            "fabric_installer_version": {"type": "string"},
+            "fabric_loader_version": {"type": "string"},
+            "forge_installer_version": {"type": "string"},
+            "forge_version": {"type": "string"},
+            "paper_version": {"type": "string"},
+            "neoforge_version": {"type": "string"},
+            "velocity_version": {"type": "string"},
+            "custom_url": {"type": "string"}
+          }
+        },
+          "version": {"type": "string"},
+        "config_files": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "plugins": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+          "dockerfile": {"type": "string"},
+          "docker_args": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "object", "array"]
+            }
+          },
+          "docker_env": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "proxy": {"type": "string"},
+          "env": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "network": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "port": {"type": "integer"},
+              "ipaddress": {"type": "string"}
+            },
+            "required": ["name", "port"]
+          },
+          "server_properties": {"type": "string"},
+          "mods": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {"type": "string"},
+                {
+                  "type": "object",
+                  "properties": {
+                    "slug": {"type": "string"},
+                    "version": {"type": "string"}
+                  },
+                  "required": ["slug"]
+                }
+              ]
+            }
+          },
+          "packs": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "datapacks": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "world": {
+            "type": "object",
+            "properties": {
+              "file": {"type": "string"},
+              "host": {"type": "string"}
+            }
+          },
+          "docker_append": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "extra_config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "path": {"type": "string"}
+              },
+              "required": ["file"]
+            }
+          }
+        },
+        "required": ["parent_image"]
+      }
+    }
+  },
+  "required": ["version", "defaults", "layers", "networks", "servers"]
+}

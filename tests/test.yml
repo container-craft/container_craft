@@ -1,0 +1,20 @@
+version: 0.1
+
+defaults:
+  build_dir: "build"
+  layers_dir: "build/layers"
+  env:
+    MINECRAFT_VERSION: "1.21.6"
+    MINECRAFT_MEMORY: "8G"
+
+layers:
+  test_layer:
+    url: "https://example.com/test_layer.git"
+    path: "layers/test_layer"
+
+servers:
+  m_jimmers_fabric_server:
+    parent_image: "m_jimmers_base_server:latest"
+    mods:
+      modrith:
+        - "test_mod"

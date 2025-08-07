@@ -1,0 +1,26 @@
+version: "0.1"
+
+## define my single server mc_jimmer_fabric_server
+
+defaults:
+  ## FIXME annoying that it is here
+  build_dir: "/srv/mincraft/build/servers/mc_jimmer_fabric_server"
+  layers_dir: "/srv/mincraft/build/servers/mc_jimmer_fabric_server/layers"
+  cache_dir: "/srv/mincraft/build/servers/mc_jimmer_fabric_server/cache"
+  downloads_dir: "/srv/mincraft/downloads"
+  env:
+    MINECRAFT_VERSION: "1.21.8"  ## set the minecraft version we are gonna build
+    MINECRAFT_MEMORY: "4G"
+
+# layers: ## none needed its a modloader base
+
+servers:
+  mc_jimmer_fabric_server:
+    parent_image: "mc_jimmer_core:latest"
+    modloader: "fabric"
+    # configs:
+    #   - "config/server.properties"
+    #   - "config/eula.txt"
+    mods:
+      modrith:
+        - "fabric-api"
