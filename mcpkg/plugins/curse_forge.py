@@ -1,18 +1,22 @@
-import os
 import time
+import json
 import httpx
-from typing import List, Optional, Dict, Any
+import zipfile
+
+from pathlib import Path
+from typing import Optional, List, Dict
 
 from mcpkg.api import McPkgApi
-from container_craft_core import log
+from container_craft_core.logger import get_logger
 from container_craft_core.config import context
-from container_craft_core.cache import verify_hash, compute_sha512
+from container_craft_core.cache import sha512sum
+from container_craft_core.error_handler import handle_error
+
+logger = get_logger("mcpkg.plugins.curse_forge")
+
 
 class CurseForgeClient(McPkgApi):
     def __init__(self):
-        super().__init__()
-        self.logger = log.getLogger("mcpkg.plugins.curseforge")
-
         self.api_key = context.env.get("CURSE_FORGE_KEY")
         if not self.api_key:
             raise RuntimeError("CURSE_FORGE_KEY must be set in environment or config.")
@@ -22,113 +26,135 @@ class CurseForgeClient(McPkgApi):
             headers={
                 "Accept": "application/json",
                 "x-api-key": self.api_key,
-                "User-Agent": "mcpkg/0.1 (https://github.com/YOUR_USERNAME/container_craft)"
+                "User-Agent": "mcpkg/0.1 (https://github.com/container-craft/container_craft)"
             },
             timeout=10.0
         )
 
-    def search(self, mod_name: str) -> List[Dict[str, Any]]:
-        self.logger.info(f"Searching for mod '{mod_name}' on CurseForge...")
+    def name(self) -> str:
+        return "curse_forge"
 
+    def base_url(self) -> str:
+        return "https://api.curseforge.com"
+
+    def key(self) -> Optional[str]:
+        return self.api_key
+
+    def do_parse(self, node: dict) -> dict:
+        if isinstance(node, str):
+            return {"slug": node, "version": None}
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                return {"slug": k, "version": v.get("version")}
+        raise ValueError(f"[curse_forge] Invalid mod node: {node}")
+
+    def do_search(self, mod_name: str, version: Optional[str] = None) -> List[dict]:
+        logger.info(f"[curse_forge] Searching: {mod_name}")
         params = {
-            "gameId": 432,        # Minecraft
+            "gameId": 432,
             "searchFilter": mod_name,
-            "pageSize": 10,
-            "classId": 6          # Mods
+            "classId": 6,
+            "pageSize": 10
         }
+        resp = self.client.get("/v1/mods/search", params=params)
+        resp.raise_for_status()
+        return resp.json().get("data", [])
 
-        response = self.client.get("/v1/mods/search", params=params)
-        response.raise_for_status()
-        data = response.json()
+    def do_fetch(self, parsed: dict, server_name: str, modloader: str, mc_version: str) -> dict:
+        slug = parsed["slug"]
+        target_dir = Path(context.env["MC_REPO_DIR"])
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-        results = data.get("data", [])
-        for mod in results:
-            self.logger.debug(f"Found: {mod['name']} (ID: {mod['id']})")
+        mod_id = self._resolve_mod_id(slug)
+        if not mod_id:
+            raise RuntimeError(f"[curse_forge] Failed to resolve slug: {slug}")
 
-        return results
+        mod_info = self._get_mod_info(mod_id)
+        file_info = self._select_file(mod_id, modloader, mc_version, parsed.get("version"))
 
-    def resolve(self, mod_id: str, version: Optional[str] = None) -> Dict[str, Any]:
-        self.logger.info(f"Resolving mod ID '{mod_id}' (version={version})...")
+        file_id = file_info["id"]
+        file_name = file_info["fileName"]
 
-        mod_resp = self.client.get(f"/v1/mods/{mod_id}")
-        mod_resp.raise_for_status()
-        mod_info = mod_resp.json()["data"]
+        resp = self.client.get(f"/v1/mods/files/{file_id}/download-url")
+        resp.raise_for_status()
+        download_url = resp.json()["data"]
 
-        files_resp = self.client.get(f"/v1/mods/{mod_id}/files")
-        files_resp.raise_for_status()
-        files = files_resp.json()["data"]
-
-        file_info = None
-        if version:
-            for f in files:
-                if f["displayName"].startswith(version) or version in f["displayName"]:
-                    file_info = f
-                    break
+        file_path = target_dir / file_name
+        if not file_path.exists():
+            logger.info(f"[curse_forge] Downloading {file_name}")
+            try:
+                with httpx.stream("GET", download_url) as response:
+                    response.raise_for_status()
+                    with open(file_path, "wb") as f:
+                        for chunk in response.iter_bytes():
+                            f.write(chunk)
+            except Exception as e:
+                handle_error(f"[curse_forge] Failed to download {download_url}", e)
         else:
-            file_info = files[0] if files else None
+            logger.info(f"[curse_forge] Cached: {file_name}")
 
-        if not file_info:
-            raise RuntimeError(f"No version found matching '{version}'")
+        sha = sha512sum(file_path)
 
         return {
-            "mod": mod_info,
-            "file": file_info
-        }
-
-    def do_package(self, mod_id: str, version: Optional[str] = None) -> str:
-        info = self.resolve(mod_id, version)
-        mod, file = info["mod"], info["file"]
-
-        file_id = file["id"]
-        file_name = file["fileName"]
-        download_url_resp = self.client.get(f"/v1/mods/files/{file_id}/download-url")
-        download_url_resp.raise_for_status()
-        download_url = download_url_resp.json()["data"]
-
-        self.logger.info(f"Downloading: {download_url}")
-        download_path = os.path.join(context.env["MC_DOWNLOADS_DIR"], file_name)
-
-        with self.client.stream("GET", download_url) as r:
-            r.raise_for_status()
-            with open(download_path, "wb") as f:
-                for chunk in r.iter_bytes():
-                    f.write(chunk)
-
-        sha = compute_sha512(download_path)
-        verify_hash(download_path, sha)
-
-        out_path = os.path.join(context.env["MC_CACHE_DIR"], f"{mod['slug']}.mcpkg")
-        metadata = {
-            "name": mod["name"],
-            "version": file["displayName"],
+            "name": mod_info["name"],
+            "version": file_info["displayName"],
             "file_name": file_name,
             "sha": sha,
-            "loader": self._guess_loader(file),
-            "provider": "curseforge",
+            "loader": context.env.get("MC_LOADER", "unknown"),
+            "provider": "curse_forge",
             "source": download_url,
             "timestamp": int(time.time()),
-            "signed_by": None
+            "signed_by": f"{server_name}_packagegroup.json.sig",
+            "authors": [a["name"] for a in mod_info.get("authors", [])]
         }
 
-        self._write_package_metadata(out_path, metadata)
-        self.logger.info(f"Wrote .mcpkg: {out_path}")
-        return out_path
+    def do_package(self, downloaded_metadata: List[dict], output_dir: str, group_name: str) -> tuple[str, str]:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
 
-    def _guess_loader(self, file_info: Dict[str, Any]) -> str:
-        # Heuristic based on filename or file metadata
-        name = file_info["fileName"].lower()
-        if "fabric" in name:
-            return "fabric"
-        if "forge" in name:
-            return "forge"
-        if "neoforge" in name:
-            return "neoforge"
-        if "quilt" in name:
-            return "quilt"
-        return "unknown"
+        zip_path = output_path / f"{group_name}.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for meta in downloaded_metadata:
+                jar_path = output_path / meta["file_name"]
+                if not jar_path.exists():
+                    raise FileNotFoundError(f"[curse_forge] Missing mod jar: {jar_path}")
+                zipf.write(jar_path, arcname=meta["file_name"])
+        logger.info(f"[curse_forge] Wrote ZIP: {zip_path}")
 
-    def _write_package_metadata(self, path: str, metadata: Dict[str, Any]) -> None:
-        import yaml
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            yaml.safe_dump(metadata, f)
+        json_path = output_path / f"{group_name}_packagegroup.json"
+        with open(json_path, "w") as f:
+            json.dump(downloaded_metadata, f, indent=2)
+        logger.info(f"[curse_forge] Wrote metadata: {json_path}")
+
+        mcpkg_path = output_path / f"{group_name}.mcpkg"
+        repo_url = context.env["MC_REPO_URL"]
+        with open(mcpkg_path, "w") as f:
+            f.write(f"{repo_url}/{group_name}_packagegroup.json\n")
+        logger.info(f"[curse_forge] Wrote .mcpkg: {mcpkg_path}")
+
+        return str(zip_path), str(json_path)
+
+    def _resolve_mod_id(self, slug: str) -> Optional[int]:
+        results = self.do_search(slug)
+        return results[0]["id"] if results else None
+
+    def _get_mod_info(self, mod_id: int) -> dict:
+        resp = self.client.get(f"/v1/mods/{mod_id}")
+        resp.raise_for_status()
+        return resp.json()["data"]
+
+    def _select_file(self, mod_id: int, loader: str, version: Optional[str], override: Optional[str] = None) -> dict:
+        resp = self.client.get(f"/v1/mods/{mod_id}/files")
+        resp.raise_for_status()
+        files = resp.json()["data"]
+
+        for f in files:
+            if version and version not in f.get("gameVersions", []):
+                continue
+            if loader and loader.lower() not in [v.lower() for v in f.get("gameVersions", [])]:
+                continue
+            return f
+
+        if files:
+            return files[0]
+        raise RuntimeError(f"[curse_forge] No file found for mod {mod_id}")

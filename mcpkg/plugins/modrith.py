@@ -12,7 +12,7 @@ from container_craft_core.error_handler import handle_error
 from container_craft_core.cache import sha512sum, sha1sum
 
 MODRINTH_API_BASE = "https://api.modrinth.com/v2"
-USER_AGENT = "m_jimmer/container_craft/0.1.0 (contact@yourdomain.com)"
+USER_AGENT = "m_jimmer/container_craft/0.1.0 (https://github.com/container-craft/container_craft)"
 
 
 class ModrinthClient(McPkgApi):
