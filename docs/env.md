@@ -7,7 +7,7 @@ These environment variables are exported into the build process for all commands
 3. By passing explicit CLI arguments, e.g.
 
 ```bash
-   container_craft build --ssh-key=/some/path/id_rsa
+   container_craft build --ssh-key=/some/path/id_rsa myconfig.yml
 ```
 
 ---
