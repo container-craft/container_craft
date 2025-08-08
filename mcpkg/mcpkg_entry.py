@@ -1,46 +1,34 @@
-import time
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Any
+import msgpack, zstandard as zstd
 
+@dataclass
 class McPkgEntry:
-    def __init__(self, slug, author, file_sha512, mod_version, file):
-        # Initialize the class attributes with the provided data
-        self.name = slug
-        self.author = author
-        self.sha = file_sha512
-        self.loader = env.get("MC_LOADER")  # Assuming env is available and set
-        self.provider = "modrith"  # Fixed provider value (can be dynamic if needed)
-        self.source = file["url"]  # URL from the file data
-        self.version = mod_version["version_number"]  # Version number from mod_version
-        self.file_name = file["filename"]  # File name from the file data
-        self.timestamp = int(time.time())  # Current timestamp in seconds
-        self.signed_by = f"{env.server}_packagegroup.json.sig"  # Signed by info (from env)
-        self.dependencies = mod_version.get("dependencies", [])  # Dependencies from mod_version, default empty list
+    name: str
+    slug: str
+    version: str
+    loader: str
+    mc_version: str
+    file_name: str
+    source: str
+    sha512: str
+    timestamp: str
+    provider: str
+    dependencies: List[Dict[str, Any]]
 
-    def get_entry(self):
-        # Return the attributes as a dictionary
-        return {
-            "name": self.name,
-            "author": self.author,
-            "sha": self.sha,
-            "loader": self.loader,
-            "provider": self.provider,
-            "source": self.source,
-            "version": self.version,
-            "file_name": self.file_name,
-            "timestamp": self.timestamp,
-            "signed_by": self.signed_by,
-            "dependencies": self.dependencies
-        }
-    def to_json(self):
-        return json.dumps({
-            "name": self.get_name(),
-            "author": self.get_author(),
-            "sha": self.get_sha(),
-            "loader": self.get_loader(),
-            "provider": self.get_provider(),
-            "source": self.get_source(),
-            "version": self.get_version(),
-            "file_name": self.get_file_name(),
-            "timestamp": self.get_timestamp(),
-            "signed_by": self.get_signed_by(),
-            "dependencies": self.get_dependencies()
-        })
+    def to_msgpack(self) -> bytes:
+        return msgpack.packb(asdict(self), use_bin_type=True)
+
+    @staticmethod
+    def from_msgpack(b: bytes) -> "McPkgEntry":
+        d = msgpack.unpackb(b, raw=False)
+        return McPkgEntry(**d)
+
+    def to_msgpack_zst(self) -> bytes:
+        c = zstd.ZstdCompressor()
+        return c.compress(self.to_msgpack())
+
+    @staticmethod
+    def from_msgpack_zst(b: bytes) -> "McPkgEntry":
+        d = zstd.ZstdDecompressor().decompress(b)
+        return McPkgEntry.from_msgpack(d)

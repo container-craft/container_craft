@@ -16,6 +16,21 @@ class McPkgApi(ABC):
         return None
 
     @abstractmethod
+    def do_update(version: str = None) -> bool
+        """
+        Used to index local index much like apt update
+        returns True if it passes else returns False
+        """
+
+    @abstractmethod
+    def do_upgrade(mod: str = None, version: str = None) -> bool
+        """
+        Used to upgrade a mod with the local index much like
+        apt upgrade
+        returns True if it passes else returns False
+        """
+
+    @abstractmethod
     def do_parse(self, node: dict) -> dict:
         """
         Parse the mcpkg YAML node for this provider.
