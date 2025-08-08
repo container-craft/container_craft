@@ -12,11 +12,17 @@ class Cache:
         self.env = env or ContainerCraftEnv()
         self.cache_dir = self.env.get_path("MC_CACHE_DIR")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Initialized Cache at: {self.cache_dir}")
 
-    def _hash(self, data: bytes) -> str:
+    def sha512sum(self, data: bytes) -> str:
+        return hashlib.sha512(data).hexdigest()
+
+    def sha1sum(self, data: bytes) -> str:
+        return hashlib.sha1(data).hexdigest()
+
+    def sha256sum(self, data: bytes) -> str:
         return hashlib.sha256(data).hexdigest()
 
+    @staticmethod
     def get_cache_path(self, key: str) -> Path:
         return self.cache_dir / key
 

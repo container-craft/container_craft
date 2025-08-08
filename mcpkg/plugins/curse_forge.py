@@ -6,11 +6,11 @@ import zipfile
 from pathlib import Path
 from typing import Optional, List, Dict
 
-from mcpkg.api import McPkgApi
+from mcpkg.plugins.api import McPkgApi
 from container_craft_core.logger import get_logger
 from container_craft_core.config import context
-from container_craft_core.cache import sha512sum
-from container_craft_core.error_handler import handle_error
+from container_craft_core.cache import cache
+from container_craft_core.error_handler import error_handler
 
 logger = get_logger("mcpkg.plugins.curse_forge")
 
@@ -89,11 +89,11 @@ class CurseForgeClient(McPkgApi):
                         for chunk in response.iter_bytes():
                             f.write(chunk)
             except Exception as e:
-                handle_error(f"[curse_forge] Failed to download {download_url}", e)
+                error_handler(f"[curse_forge] Failed to download {download_url}", e)
         else:
             logger.info(f"[curse_forge] Cached: {file_name}")
 
-        sha = sha512sum(file_path)
+        sha = cache.sha512sum(file_path)
 
         return {
             "name": mod_info["name"],

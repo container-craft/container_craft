@@ -7,9 +7,6 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 
-from mcpkg.cli import main
+from mcpkg.cli import parse_commands
 if __name__ == "__main__":
-    main()
-
-
-
+    parse_commands()

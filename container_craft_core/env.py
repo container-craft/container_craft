@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
+import logging
 
 
 # Default values — lowest precedence
@@ -10,9 +11,11 @@ BASE_DEFAULTS = {
     "MC_MEMORY": "4G",
     "MC_BASE": "/home/mc",
     "MC_PORT": "25565",
+    "MC_LOADER": "fabric",
 
     # Container Craft core paths
     "MC_WORK_DIR": os.getcwd(),
+    "MC_BUILD_DIR": os.path.join(os.getcwd(), "build"),
     "VELOCITY_FILES": "",
 
     # Optional
@@ -24,19 +27,18 @@ BASE_DEFAULTS = {
     "SSH_ASKPASS": None,
 
     "CURSE_FORGE_KEY": None,
+    "MC_INCLUDE_PRE": None ,
 }
 
-def derived_defaults(work_dir: str) -> Dict[str, str]:
+def derived_defaults(work_dir: str, build_dir: str) -> Dict[str, str]:
     return {
-        "MC_BUILD_DIR": os.path.join(work_dir, "build"),
-        "MC_DOWNLOADS_DIR": os.path.join(work_dir, "downloads"),
-        "MC_CACHE_DIR": os.path.join(work_dir, "cache"),
-        "MC_LAYERS_DIR": os.path.join(work_dir, "build", "layers"),
+        "MC_DOWNLOADS_DIR": os.path.join(build_dir, "downloads"),
+        "MC_CACHE_DIR": os.path.join(build_dir, "cache"),
+        "MC_LAYERS_DIR": os.path.join(build_dir, "layers"),
         "MC_CONFIG": os.path.join(work_dir, ".config.yml"),
     }
 
 ALL_KNOWN_VARS = set(BASE_DEFAULTS.keys()) | {
-    "MC_BUILD_DIR",
     "MC_DOWNLOADS_DIR",
     "MC_CACHE_DIR",
     "MC_LAYERS_DIR",
@@ -49,11 +51,20 @@ class ContainerCraftEnv:
         self.config_defaults = config_defaults or {}
         self.cli_args = cli_args or {}
 
-        self.work_dir = self._get_raw("MC_WORK_DIR")
+        # Initialize defaults first
         self._defaults = {
             **BASE_DEFAULTS,
-            **derived_defaults(self.work_dir),
+            **derived_defaults(BASE_DEFAULTS["MC_WORK_DIR"], BASE_DEFAULTS["MC_BUILD_DIR"]),
         }
+        logging.debug(f"Defaults initialized: {self._defaults}")
+
+        # Now resolve work_dir
+        self.work_dir = self._get_raw("MC_WORK_DIR")
+        logging.debug(f"Work directory resolved to: {self.work_dir}")
+
+        # Update defaults with derived values based on resolved work_dir
+        self._defaults.update(derived_defaults(self.work_dir, self.get("MC_BUILD_DIR")))
+        logging.debug(f"Updated defaults with work_dir: {self._defaults}")
 
     def _get_raw(self, key: str) -> Optional[str]:
         # Priority: CLI > config > os.environ > base defaults
@@ -81,3 +92,5 @@ class ContainerCraftEnv:
 
     def dump(self) -> str:
         return "\n".join(f"{k}: {self.get(k)}" for k in sorted(ALL_KNOWN_VARS))
+
+env = ContainerCraftEnv()

@@ -6,13 +6,13 @@ import httpx
 from pathlib import Path
 from typing import Optional, List
 
-from mcpkg.api import McPkgApi
+from mcpkg.plugins.api import McPkgApi
 from container_craft_core.logger import get_logger
-from container_craft_core.error_handler import handle_error
+from container_craft_core.error_handler import error_handler
 from container_craft_core.config import context
-from container_craft_core.cache import cache, sha512sum
+from container_craft_core.cache import cache
 
-logger = get_logger("mcpkg.plugins.hanger")
+log = get_logger("mcpkg.plugins.hanger")
 
 
 class HangerClient(McPkgApi):
@@ -39,7 +39,7 @@ class HangerClient(McPkgApi):
         file_path = repo_dir / file_name
 
         if not file_path.exists():
-            logger.info(f"[hanger] Downloading: {url}")
+            log.info(f"[hanger] Downloading: {url}")
             try:
                 with httpx.stream("GET", url) as response:
                     response.raise_for_status()
@@ -47,11 +47,11 @@ class HangerClient(McPkgApi):
                         for chunk in response.iter_bytes():
                             f.write(chunk)
             except Exception as e:
-                handle_error(f"[hanger] Failed to download {url}", e)
+                error_handler(f"[hanger] Failed to download {url}", e)
         else:
-            logger.info(f"[hanger] Using cached file: {file_name}")
+            log.info(f"[hanger] Using cached file: {file_name}")
 
-        sha = sha512sum(file_path)
+        sha = cache.sha512sum(file_path)
 
         return {
             "name": file_name.rsplit(".", 1)[0],
@@ -77,19 +77,19 @@ class HangerClient(McPkgApi):
                 if not jar_path.exists():
                     raise FileNotFoundError(f"Missing mod jar: {jar_path}")
                 zipf.write(jar_path, arcname=meta["file_name"])
-        logger.info(f"[hanger] Created ZIP archive: {zip_path}")
+        log.info(f"[hanger] Created ZIP archive: {zip_path}")
 
         # 2. Write packagegroup metadata
         json_path = output_path / f"{group_name}_packagegroup.json"
         with open(json_path, "w") as f:
             json.dump(downloaded_metadata, f, indent=2)
-        logger.info(f"[hanger] Created packagegroup JSON: {json_path}")
+        log.info(f"[hanger] Created packagegroup JSON: {json_path}")
 
         # 3. Write .mcpkg pointer
         mcpkg_path = output_path / f"{group_name}.mcpkg"
         repo_url = context.env["MC_REPO_URL"]
         with open(mcpkg_path, "w") as f:
             f.write(f"{repo_url}/{group_name}_packagegroup.json\n")
-        logger.info(f"[hanger] Wrote .mcpkg: {mcpkg_path}")
+        log.info(f"[hanger] Wrote .mcpkg: {mcpkg_path}")
 
         return str(zip_path), str(json_path)

@@ -3,7 +3,7 @@ import traceback
 from typing import Optional
 from container_craft_core.logger import get_logger
 
-logger = get_logger("container_craft.error")
+error_logger = get_logger("container_craft.error")
 
 class ErrorHandler:
     def __init__(self, exit_on_error: bool = True):
@@ -27,9 +27,9 @@ class ErrorHandler:
         """
         if exc:
             tb = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            logger.critical(f"{message}: {exc}\n{tb}")
+            error_logger.critical(f"{message}: {exc}\n{tb}")
         else:
-            logger.critical(message)
+            error_logger.critical(message)
 
         if fatal:
             if self.exit_on_error:

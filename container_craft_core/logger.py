@@ -18,8 +18,9 @@ def get_logger(category: str) -> logging.Logger:
     if not logger.handlers:
         # Only add handler if not already attached
         handler = logging.StreamHandler(sys.stdout)
+        # %(asctime)s
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(levelname)s %(name)s:  %(message)s'
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -28,4 +29,6 @@ def get_logger(category: str) -> logging.Logger:
     return logger
 
 # Default/base logger used when no specific category is passed
-base_logger = get_logger("container_craft")
+logger = get_logger("[CONTAINER_CRAFT] ")
+core_logger = get_logger("[Core] ")
+mcpkg_logger = get_logger("[MCPKG] ")

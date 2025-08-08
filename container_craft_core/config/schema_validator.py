@@ -5,7 +5,7 @@ from pathlib import Path
 from container_craft_core.logger import get_logger
 from container_craft_core.error_handler import error_handler
 from container_craft_core.env import ContainerCraftEnv
-from container_craft_core.__version__ import LOCAL_VERSION, SUPPORTED_VERSIONS
+from container_craft_core import LOCAL_VERSION, SUPPORTED_VERSIONS
 
 logger = get_logger(__name__)
 

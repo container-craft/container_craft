@@ -4,20 +4,19 @@ import httpx
 from pathlib import Path
 from typing import Optional
 
-from mcpkg.api import McPkgApi
-from container_craft_core.env import ContainerCraftEnv
-from container_craft_core.context import context
-from container_craft_core.logger import logger
-from container_craft_core.error_handler import handle_error
-from container_craft_core.cache import sha512sum, sha1sum
+from mcpkg.plugins.api import McPkgApi
+from container_craft_core.env import env
+from container_craft_core.config.context import context
+from container_craft_core.logger import mcpkg_logger
+from container_craft_core.error_handler import error_handler
+from container_craft_core.cache import cache
 
 MODRINTH_API_BASE = "https://api.modrinth.com/v2"
-USER_AGENT = "m_jimmer/container_craft/0.1.0 (https://github.com/container-craft/container_craft)"
-
+USER_AGENT = "m_jimmer/container_craft/0.1.0 (m_jimmer@dontspamme.com)"
 
 class ModrinthClient(McPkgApi):
     def __init__(self):
-        self.env = ContainerCraftEnv(context)
+        self.env = env
         self.client = httpx.Client(
             base_url=MODRINTH_API_BASE,
             headers={"User-Agent": USER_AGENT}
@@ -48,8 +47,12 @@ class ModrinthClient(McPkgApi):
             raise RuntimeError(f"Failed to fetch versions for {slug}: {res.status_code}")
         versions = res.json()
         for v in versions:
-            if version in v.get("game_versions", []) and self.env.get("MC_LOADER") in v.get("loaders", []):
-                return v
+            if isinstance(v, dict):
+                if version in v.get("game_versions", []) and self.env.get("MC_LOADER") in v.get("loaders", []):
+                  # pkg = McPkgConig()
+                  ## in this plugin we create the pkg to return
+
+                  return v
         raise RuntimeError(f"No matching version found for {slug} with version {version} and loader {self.env.get('MC_LOADER')}")
 
     def do_fetch(self, slug: str, version: Optional[str] = None):
@@ -67,7 +70,7 @@ class ModrinthClient(McPkgApi):
         target_path = target_dir / filename
 
         if target_path.exists():
-            logger.info(f"[modrith] Using cached mod: {target_path}")
+            mcpkg_logger.info(f"[modrith] Using cached mod: {target_path}")
             return target_path
 
         self._rate_limit()
@@ -77,10 +80,10 @@ class ModrinthClient(McPkgApi):
                 with target_path.open("wb") as f:
                     for chunk in response.iter_bytes():
                         f.write(chunk)
-            logger.info(f"[modrith] Downloaded mod to: {target_path}")
+            mcpkg_logger.info(f"[modrith] Downloaded mod to: {target_path}")
             return target_path
         except Exception as e:
-            handle_error(f"Failed to download {url}", e)
+            error_handler(f"Failed to download {url}", e)
 
     def do_parse(self, node: dict):
         """
@@ -104,8 +107,8 @@ class ModrinthClient(McPkgApi):
             raise RuntimeError(f"No downloadable file for {slug}")
 
         file_path = self._download_file(file["url"], file["filename"])
-        file_sha512 = sha512sum(file_path)
-        file_sha1 = sha1sum(file_path)
+        file_sha512 = cache.sha512sum(file_path)
+        file_sha1 = cache.sha1sum(file_path)
 
         pkg_entry = {
             "name": slug,

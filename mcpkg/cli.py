@@ -1,7 +1,8 @@
 import sys
 import argparse
-from importlib import import_module
 from container_craft_core.logger import logger
+
+from mcpkg.commands.search import search
 
 # All supported top-level commands
 COMMANDS = {
@@ -15,29 +16,41 @@ COMMANDS = {
     "verify",
 }
 
-def parse_commands(parser):
+def parse_commands():
+    parser = argparse.ArgumentParser(
+        prog="mcpkg",
+        description="Welcome to MCPkg CLI - Minecraft Package Manager"
+    )
+    command_parser = parser.add_subparsers(dest="command", help="subcommands help")
+
+    # --- search subcommand ---
+    search_parser = command_parser.add_parser("search", help="Search for mods from a provider")    
+    search.args(search_parser)
 
 
-    parser.add_argument("command", help="Command to run", choices=COMMANDS)
-    parser.add_argument("extra", nargs=argparse.REMAINDER, help="Additional arguments passed to the subcommand")
 
+
+
+
+    # --- other stubs ---
+    command_parser.add_parser("create", help="Create a repo or package (TODO).")
+    command_parser.add_parser("install", help="Install a package (TODO).")
+    command_parser.add_parser("list", help="List packages (TODO).")
+    command_parser.add_parser("remove", help="Remove a package (TODO).")
+    command_parser.add_parser("update", help="Update package metadata (TODO).")
+    command_parser.add_parser("upgrade", help="Upgrade packages (TODO).")
+    command_parser.add_parser("verify", help="Verify signatures (TODO).")
+
+
+    # parse the main parser now that we have the subcommands set up
     args = parser.parse_args()
+    if args.command == "search":
+        return search.run(search_parser)
+    
+    elif args.command in COMMANDS:
+        logger.warning(f"Command '{args.command}' not yet implemented.")
+        parser.print_help()
+        return 2
 
-    command_name = args.command
-    extra_args = args.extra
 
-    try:
-        command_module = import_module(f"mcpkg.commands.{command_name}")
-    except ImportError as e:
-        logger.error(f"Unknown or unimplemented command: {command_name}")
-        sys.exit(1)
-
-    if not hasattr(command_module, "run"):
-        logger.error(f"Command '{command_name}' does not implement a run() function.")
-        sys.exit(1)
-
-    try:
-        command_module.run(extra_args)
-    except Exception as e:
-        logger.exception(f"Error while executing command '{command_name}': {e}")
-        sys.exit(1)
+    logger.warning(f"Command '{args.command}' not yet implemented.")

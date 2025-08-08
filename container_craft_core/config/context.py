@@ -3,9 +3,9 @@ import json
 import yaml
 from pathlib import Path
 
-from container_craft_core.schema_validator import SchemaValidator
+from container_craft_core.config.schema_validator import SchemaValidator
 from container_craft_core.env import ContainerCraftEnv
-from container_craft_core.error_handling import error_handler
+from container_craft_core.error_handler import error_handler
 from container_craft_core.logger import get_logger
 
 logger = get_logger("context")
